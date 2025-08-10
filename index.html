@@ -1,0 +1,309 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>MNIST-Gen: Modular MNIST-Style Dataset Generation</title>
+  <meta name="description" content="MNIST-Gen is a modular pipeline for generating MNIST-style datasets from hierarchical semantics, CLIP understanding, RL + human feedback, and category-theoretic composition." />
+  <link rel="icon" href="favicon.ico" />
+  <style>
+    :root {
+      --bg:#0b0c10; --panel:#111318; --ink:#e7ecef; --muted:#b8c1c6;
+      --brand:#4cc9f0; --accent:#a3ffd6; --line:#1c1f27;
+      --radius:18px; --shadow:0 10px 30px rgba(0,0,0,.25);
+
+      /* Blue shades for primary button */
+      --blue:#1e6df2;       /* base blue */
+      --blue-hover:#60a5fa; /* lighter blue */
+    }
+
+    *{box-sizing:border-box}
+    html{scroll-behavior:smooth}
+
+    body{
+      margin:0;
+      background:linear-gradient(180deg,#0b0c10 0%, #0e1116 100%);
+      color:var(--ink);
+      font-family:Inter,system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+      line-height:1.55;
+    }
+    a{color:var(--brand);text-decoration:none}
+    a:hover{text-decoration:underline}
+
+    /* ===== Sticky, collapsing header ===== */
+    #main-header{
+      position:sticky; top:0; z-index:1000;
+      background:rgba(11,12,16,0.75);
+      backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
+      transition:background .3s ease, box-shadow .3s ease;
+    }
+    .header-inner{max-width:1100px;margin:0 auto;padding:14px 20px 12px}
+    .header-title-row{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:42px}
+    .site-title{font-size:clamp(22px,3.2vw,34px);font-weight:800;margin:0;letter-spacing:.2px;line-height:1.2}
+
+    /* Buttons next to title: start hidden, appear on scroll */
+    .header-buttons{display:flex;gap:8px;opacity:0;transform:translateY(-8px);filter:blur(6px);pointer-events:none;transition:opacity .45s ease, transform .45s ease, filter .45s ease}
+    .btn.small{padding:6px 12px;font-size:13px;border-radius:10px}
+
+    /* Big intro block below title: fades & collapses on scroll */
+    .intro-content{
+      margin-top:8px;
+      overflow:hidden;                 /* allow height collapse */
+      transition:opacity .45s ease, transform .45s ease, filter .45s ease, max-height .45s ease, margin .45s ease, padding .45s ease;
+      /* a safe starting height so the transition can animate; adjust if your intro grows */
+      max-height: 320px;
+    }
+    .intro-content .pill{display:inline-flex;gap:8px;align-items:center;background:#0f1320;border:1px solid #1f2533;color:#cfe8ff;padding:6px 10px;border-radius:999px;font-size:12px}
+    .intro-content .lead{color:var(--muted);font-size:18px;max-width:900px;margin:10px 0 0}
+    .intro-content .btns{display:flex;flex-wrap:wrap;gap:12px;margin-top:14px}
+
+    /* Scrolled state: collapse intro, reveal title buttons */
+    #main-header.scrolled{background:rgba(11,12,16,0.82);box-shadow:0 8px 20px rgba(0,0,0,.35)}
+    #main-header.scrolled .intro-content{
+      opacity:0; transform:translateY(-10px); filter:blur(6px);
+      max-height:0; margin:0; padding:0; pointer-events:none;
+    }
+    #main-header.scrolled .header-buttons{
+      opacity:1; transform:translateY(0); filter:blur(0); pointer-events:auto;
+    }
+
+    /* ===== Rest of layout ===== */
+    .wrap{max-width:1100px;margin:24px auto;padding:0 20px 64px}
+    .panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:22px}
+    .grid{display:grid;gap:18px}
+    @media (min-width:880px){.grid-2{grid-template-columns:1.2fr .8fr}.grid-3{grid-template-columns:repeat(3,1fr)}}
+
+    figure{margin:0}
+    img{width:100%;height:auto;border-radius:14px;border:1px solid var(--line);background:#0a0c10}
+
+    .btn{
+      display:inline-flex;align-items:center;justify-content:center;gap:10px;
+      padding:12px 16px;border-radius:12px;border:1px solid #243043;
+      background:#141925;color:#dfe9f5;font-weight:600;letter-spacing:.2px;text-decoration:none;
+      transition:background .3s ease,border-color .3s ease,transform .25s ease,filter .25s ease;
+    }
+    .btn:hover{transform:translateY(-4px);background:#2a3a5a;border-color:#3a4d7a;text-decoration:none}
+    .btn.primary{background:var(--blue);border-color:#1b4ecf;color:#fff}
+    .btn.primary:hover{background:var(--blue-hover);border-color:#93c5fd;transform:translateY(-4px)}
+    .btn.outline{background:transparent;border-color:#2b3548}
+    .btn.outline:hover{background:rgba(255,255,255,.05);border-color:#3b4b68}
+
+    .kicker{color:#9bb6ff;font-weight:700;letter-spacing:.26em;text-transform:uppercase;font-size:12px;margin-bottom:8px}
+    .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace}
+    .cite-box{background:#0f1320;border:1px dashed #2b3548;border-radius:14px;padding:16px}
+    footer{border-top:1px solid var(--line);margin-top:36px;padding:24px 0;color:#8ea3ad}
+    .small{font-size:13px;color:#98a8b3}
+    .center{text-align:center}
+
+    /* Workflow image large at top of its section */
+    .workflow-img{display:block;width:100%;max-width:1000px;margin:0 auto 12px;border-radius:14px;border:1px solid var(--line)}
+
+    #datasets {
+        scroll-margin-top: 250px; /* adjust this to match your sticky header height */
+    }
+
+    .intro-content,
+    .header-buttons {
+      will-change: opacity, transform, filter, max-height;
+    }
+    
+    /* Respect reduced motion */
+    @media (prefers-reduced-motion:reduce){
+      .btn,.intro-content,.header-buttons,#main-header{transition:none !important}
+      .btn:hover{transform:none}
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- Sticky, collapsing header -->
+  <header id="main-header">
+    <div class="header-inner">
+      <div class="header-title-row">
+        <h1 class="site-title">MNIST-Gen</h1>
+        <div class="header-buttons">
+          <a class="btn primary small" href="#datasets">Datasets</a>
+          <a class="btn outline small" href="#citation">Cite</a>
+          <a class="btn outline small" href="https://arxiv.org/abs/2507.11821" target="_blank" rel="noopener">PDF</a>
+          <a class="btn outline small" href="https://github.com/pouyashaeri/MNISTGen" target="_blank" rel="noopener">Code</a>
+        </div>
+      </div>
+
+      <!-- This block fades & collapses (height shrinks) on scroll -->
+      <div class="intro-content">
+        <span class="pill">Open research project</span>
+        <p class="lead">A modular pipeline for generating MNIST-style datasets from user-defined categories using hierarchical semantics, CLIP-based understanding, multiple processing modes, RL + human feedback, and a category-theoretic composition of transformations.</p>
+        <div class="btns">
+          <!-- Update these links -->
+          <a class="btn primary" href="https://github.com/pouyashaeri/MNISTGen" target="_blank" rel="noopener">Code on GitHub</a>
+          <a class="btn outline" href="#datasets">Datasets</a>
+          <a class="btn outline" href="#citation">Cite</a>
+          <a class="btn outline" href="https://arxiv.org/abs/2507.11821" target="_blank" rel="noopener">PDF</a>
+        </div>
+      </div>
+      <div id="scroll-sentinel" aria-hidden="true" style="height:1px;"></div>
+    </div>
+  </header>
+
+  <main class="wrap">
+
+    <!-- Workflow -->
+    <section class="panel">
+      <div class="kicker">Workflow</div>
+      <h2 style="margin-top:0">End-to-end pipeline</h2>
+
+      <figure>
+        <img class="workflow-img" src="assets/WhiteWorkflow.png" alt="MNIST-Gen workflow diagram" />
+        <figcaption class="small center">Figure: MNIST-Gen workflow.</figcaption>
+      </figure>
+
+      <p class="small">Keyword-driven retrieval → hierarchical semantic categorization (CLIP) → processing modes (Individual, Smart Batch, Fast Batch) → RL + human feedback → MNIST-style grayscale output (28×28 / 64×64).</p>
+      <ul class="small">
+        <li>Composable transformations (category-theoretic view: morphisms, functors, natural transformations)</li>
+        <li>Adaptive filtering via RL (keep / discard / send to review)</li>
+        <li>Reproducible configs for class hierarchies and processing</li>
+      </ul>
+    </section>
+
+    <!-- Samples + dataset links -->
+    <section id="datasets" class="panel" style="margin-top:18px">
+      <div class="kicker">Datasets</div>
+      <h2 style="margin-top:0">Food-MNIST and Tree-MNIST</h2>
+      <div class="grid grid-2" style="margin-top:10px">
+        <figure>
+          <img src="assets/FoodMNIST.png" 
+            alt="Food-MNIST sample images" 
+            style="max-width:500px;width:100%;height:auto;margin-bottom:6px;border-radius:10px" />
+          <figcaption class="small">Food-MNIST (10 categories, 30 subcategories)</figcaption>
+          <br />
+          <div class="btns">
+            <a class="btn" href="assets/MNISTGen_FoodMNIST_DataGenerated_Batch_Volume1.zip" target="_blank" rel="noopener">
+              Download Food-MNIST
+            </a>
+          </div>
+        </figure>
+        <figure>
+          <img src="assets/TreeMNIST.png" alt="Tree-MNIST sample images"
+          style="max-width:800px;width:100%;height:auto;margin-bottom:6px;border-radius:10px"
+          />
+          <figcaption class="small">Tree-MNIST (4 categories, 12 subcategories)</figcaption>
+          <br />
+          <div class="btns">
+            <a class="btn" href="assets/MNISTGen_TreeMNIST_DataGenerated_Batch_Volume1.zip" target="_blank" rel="noopener">
+              Download Tree-MNIST
+            </a>
+          </div>
+        </figure>
+      </div>
+      <p class="small" style="margin-top:8px">
+        Both datasets are MNIST-style grayscale formats with metadata for hierarchical labels.
+      </p>
+    </section>
+
+
+    <!-- Citation -->
+    <section id="citation" class="panel" style="margin-top:18px">
+      <div class="kicker">Citation</div>
+      <h2 style="margin-top:0">Copyright and cite MNIST-Gen</h2>
+      <p class="small">If you use MNIST-Gen, cite the following paper:</p>
+
+      <div class="cite-box">
+        <p class="mono" style="white-space:pre-wrap;margin:0 0 10px 0">
+Shaeri, P., Karimi, A., &amp; Middel, A. (2025). MNIST-Gen: A Modular MNIST-Style Dataset Generation Using Hierarchical Semantics, Reinforcement Learning, and Category Theory. <i>arXiv</i>:2507.11821.
+        </p>
+        <details>
+          <summary class="small" style="cursor:pointer">Show BibTeX</summary>
+          <pre class="mono" id="bibtex" style="font-size:13px;overflow:auto;margin-top:10px">
+@misc{shaeri2025mnistgenmodularmniststyledataset,
+      title={MNIST-Gen: A Modular MNIST-Style Dataset Generation Using Hierarchical Semantics, Reinforcement Learning, and Category Theory}, 
+      author={Pouya Shaeri and Arash Karimi and Ariane Middel},
+      year={2025},
+      eprint={2507.11821},
+      archivePrefix={arXiv},
+      primaryClass={cs.LG},
+      url={https://arxiv.org/abs/2507.11821}, 
+}
+          </pre>
+          <div class="btns">
+            <button class="btn" onclick="copyBib()">Copy BibTeX</button>
+          </div>
+        </details>
+      </div>
+      <p class="small" style="margin-top:10px">Paper PDF: <a href="https://arxiv.org/abs/2507.11821" target="_blank" rel="noopener">MNISTGenPaper.pdf</a></p>
+    </section>
+
+    <!-- Footer -->
+    <footer class="center">
+      <div class="small">© <span id="y"></span> MNIST-Gen • Built for reproducible, domain-specific MNIST-style datasets.</div>
+      <div class="small" style="margin-top:6px">
+        Code: <a href="https://github.com/pouyashaeri/MNISTGen" target="_blank" rel="noopener">GitHub</a>
+        • Issues &amp; requests welcome.
+      </div>
+    </footer>
+
+  </main>
+
+  <script>
+  const header = document.getElementById('main-header');
+
+  // Hysteresis thresholds (tweak to taste)
+  const ADD_AT = 10;   // add .scrolled when passing this
+  const REMOVE_AT = 50; // remove .scrolled when going back above top
+
+  let ticking = false;
+
+  function updateHeaderState() {
+    const y = window.scrollY || document.documentElement.scrollTop;
+
+    if (!header.classList.contains('scrolled') && y > ADD_AT) {
+      header.classList.add('scrolled');
+    } else if (header.classList.contains('scrolled') && y < REMOVE_AT) {
+      header.classList.remove('scrolled');
+    }
+
+    ticking = false;
+  }
+
+  function onScroll() {
+    if (!ticking) {
+      window.requestAnimationFrame(updateHeaderState);
+      ticking = true;
+    }
+  }
+
+  document.addEventListener('scroll', onScroll, { passive: true });
+  // run once on load
+  updateHeaderState();
+</script>
+
+<script>
+  // Remove any older scroll handlers you added before using this.
+
+  const mainHeaderEl = document.getElementById('main-header');
+  const sentinelEl = document.getElementById('scroll-sentinel');
+
+  // As soon as the sentinel is above ~12px from the top, mark as scrolled.
+  const observer = new IntersectionObserver(([entry]) => {
+    const scrolled = !entry.isIntersecting; // not visible past the offset
+    mainHeaderEl.classList.toggle('scrolled', scrolled);
+  }, {
+    root: null,
+    threshold: 0,
+    rootMargin: '-12px 0px 0px 0px'  // ← a tiny nudge triggers it
+  });
+
+  observer.observe(sentinelEl);
+
+  // Run once on load (handles refresh mid-scroll)
+  requestAnimationFrame(() => {
+    const rect = sentinelEl.getBoundingClientRect();
+    const scrolled = rect.top < 12; // mirrors rootMargin
+    mainHeaderEl.classList.toggle('scrolled', scrolled);
+  });
+</script>
+
+
+
+</body>
+</html>
