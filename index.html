@@ -226,7 +226,7 @@ Shaeri, P., Karimi, A., &amp; Middel, A. (2025). MNIST-Gen: A Modular MNIST-Styl
 }
           </pre>
           <div class="btns">
-            <button class="btn" onclick="copyBib()">Copy BibTeX</button>
+            <button class="btn" onclick="copyBib(this)">Copy BibTeX</button>
           </div>
         </details>
       </div>
@@ -302,6 +302,44 @@ Shaeri, P., Karimi, A., &amp; Middel, A. (2025). MNIST-Gen: A Modular MNIST-Styl
     mainHeaderEl.classList.toggle('scrolled', scrolled);
   });
 </script>
+
+<script>
+function copyBib(btn) {
+  const bibText = document.getElementById("bibtex").textContent.trim();
+
+  // Try modern Clipboard API, fallback if needed
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(bibText).then(() => {
+      flashCopied(btn);
+    }).catch(() => fallbackCopy(bibText, btn));
+  } else {
+    fallbackCopy(bibText, btn);
+  }
+}
+
+function fallbackCopy(text, btn){
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed';
+  ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  ta.select();
+  try { document.execCommand('copy'); } catch(e) { /* ignore */ }
+  document.body.removeChild(ta);
+  flashCopied(btn);
+}
+
+function flashCopied(btn){
+  const original = btn.textContent;
+  btn.textContent = "Copied!";
+  btn.disabled = true;
+  setTimeout(() => {
+    btn.textContent = original;
+    btn.disabled = false;
+  }, 1600);
+}
+</script>
+
 
 
 
